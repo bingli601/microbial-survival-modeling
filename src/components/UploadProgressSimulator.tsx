@@ -1,18 +1,27 @@
-// ==========================================
-// 🔧 WEEK 2: UploadProgressSimulator.tsx (Optimized Final Version)
-// ==========================================
+// UploadProgressSimulator.tsx
+// Simulated file upload component for CSV files
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { ExpectedRow, parseCSVFile } from "@/utils/microbialUtils";
 
-const UploadProgressSimulator = () => {
-  // 🧠 State variables
+type UploadSimulatorProps = {
+  onComplete: (data: ExpectedRow[], filename: string) => void;
+};
+
+const UploadProgressSimulator: React.FC<UploadSimulatorProps> = ({ onComplete }) => {
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-
-  // 🔒 ref 用来存定时器 ID，避免重复触发 & 组件卸载后报错
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 📌 清理 interval（避免内存泄漏）
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
   const clearTimer = () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -20,95 +29,105 @@ const UploadProgressSimulator = () => {
     }
   };
 
-  // =============================
-  // ▶ Start Upload Simulation
-  // =============================
+  // Start simulated upload
   const startUpload = () => {
-    if (isUploading) return; // double-click protection
+    if (!selectedFile) {
+      setStatusMessage("Please select a CSV file first.");
+      return;
+    }
+    if (isUploading) return;
 
     setIsUploading(true);
     setProgress(0);
+    setStatusMessage("Preparing upload...");
 
     intervalRef.current = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) {
+        const next = Math.min(prev + Math.floor(3 + Math.random() * 8), 100);
+
+        if (next >= 100) {
           clearTimer();
           setIsUploading(false);
-          return 100;
+          setStatusMessage("Upload complete — processing file...");
+
+          setTimeout(() => {
+            if (selectedFile) {
+              parseCSVFile(selectedFile)
+                .then((rows) => {
+                  setStatusMessage("File parsed. Loading data...");
+                  onComplete(rows, selectedFile.name);
+                })
+                .catch((err) => {
+                  console.error("CSV parse error", err);
+                  setStatusMessage("Failed to parse CSV file. Check format.");
+                });
+            } else {
+              setStatusMessage("No file found after upload.");
+            }
+          }, 400);
+        } else {
+          // update dynamic messages
+          if (next < 10) setStatusMessage("Starting upload...");
+          else if (next < 40) setStatusMessage("Uploading...");
+          else if (next < 70) setStatusMessage("Making good progress...");
+          else if (next < 95) setStatusMessage("Almost done...");
+          else setStatusMessage("Finishing up...");
         }
-        return prev + 5; // 每 100ms +5%
+
+        return next;
       });
-    }, 100);
+    }, 120);
   };
 
-  // =============================
-  // ▶ Manually Add Progress (+25%)
-  // =============================
+  const resetProgress = () => {
+    clearTimer();
+    setIsUploading(false);
+    setProgress(0);
+    setStatusMessage(null);
+  };
+
   const addProgress = () => {
     if (isUploading) return;
-
-    setProgress((prev) => Math.min(prev + 25, 100));
+    setProgress((p) => Math.min(100, p + 25));
   };
 
-  // =============================
-  // ▶ Reset
-  // =============================
-  const resetProgress = () => {
-    clearTimer(); // 重要：避免残留 interval
-    setIsUploading(false);
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    setStatusMessage(file ? `Selected file: ${file.name}` : null);
     setProgress(0);
   };
 
-  // =============================
-  // 🧹 Clean interval on unmount
-  // =============================
-  useEffect(() => {
-    return () => clearTimer();
-  }, []);
-
-  // =============================
-  // ✨ Dynamic Status Message
-  // =============================
-  const getStatusMessage = () => {
-    if (isUploading) return "Uploading your file...";
-
-    if (progress === 0) return "Ready to start!";
-    if (progress < 25) return "Just getting started...";
-    if (progress < 50) return "Making progress!";
-    if (progress < 75) return "More than halfway there!";
-    if (progress < 100) return "Almost done!";
-    if (progress === 100) return "Upload complete! 🎉";
-
-    return "";
-  };
-
   return (
-    <div className="progress-container p-6 bg-white rounded-lg shadow-md max-w-md mx-auto">
-      <h2 className="text-2xl font-bold text-center mb-6">
-        File Upload Simulator
-      </h2>
+    <div className="progress-container p-6 bg-white rounded-lg shadow-md">
+      <h3 className="text-xl font-semibold mb-4">Upload CSV (Simulated)</h3>
 
-      {/* 📊 Progress Bar */}
+      {/* File input */}
+      <div className="mb-3">
+        <input type="file" accept=".csv,text/csv" onChange={onFileChange} disabled={isUploading} className="w-full" />
+      </div>
+
+      {/* Progress bar */}
       <div className="mb-4">
         <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300 ease-out"
+            className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-200 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
       </div>
 
-      {/* 📈 Numeric Progress */}
-      <div className="text-center mb-6">
-        <span className="text-3xl font-bold text-blue-600">{progress}%</span>
-        <div className="text-sm text-gray-600 mt-2">{getStatusMessage()}</div>
+      {/* Numeric progress and status message */}
+      <div className="text-center mb-4">
+        <div className="text-3xl font-bold text-blue-600">{progress}%</div>
+        <div className="text-sm text-gray-600 mt-2">{statusMessage ?? (progress === 0 ? "Ready to upload" : "")}</div>
       </div>
 
-      {/* 🎮 Control Buttons */}
-      <div className="flex justify-center gap-3">
+      {/* Controls */}
+      <div className="flex justify-center gap-3 mb-3">
         <button
           onClick={startUpload}
-          disabled={isUploading || progress === 100}
+          disabled={isUploading || progress === 100 || !selectedFile}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-400"
         >
           {isUploading ? "Uploading..." : "Start Upload"}
@@ -131,12 +150,12 @@ const UploadProgressSimulator = () => {
         </button>
       </div>
 
-      {/* 🎉 Fun messages */}
-      <div className="text-center mt-4 text-sm text-gray-600">
-        {progress === 0 && "Let's begin!"}
-        {progress > 0 && progress < 50 && "Uploading like a champ 🚀"}
-        {progress >= 50 && progress < 100 && "Keep going... almost there!"}
-        {progress === 100 && "Well done! 🎊"}
+      {/* Fun messages */}
+      <div className="text-center text-sm text-gray-600">
+        {progress === 0 && "Select a CSV and click Start Upload"}
+        {progress > 0 && progress < 50 && "Uploading — sit tight!"}
+        {progress >= 50 && progress < 100 && "More than halfway there!"}
+        {progress === 100 && "Upload completed. Parsing..."}
       </div>
     </div>
   );

@@ -1,182 +1,192 @@
-
-import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { DataRow } from '@/types/data';
-import { getDataSummary, getColumnValues } from '@/utils/dataAnalysis';
-
-// 📊 Week 6: Professional Data Visualization - Making Your Data Come Alive
-// Students - Transform raw data into compelling visual stories! This component showcases advanced React patterns.
-// 
-// Journey milestone: By now you've built the foundation (Weeks 1-5), now we're adding professional polish!
-// 
-// Learning objectives:
-// - Master React performance optimization with useMemo
-// - Create dynamic, responsive charts with Recharts
-// - Implement user-controlled data visualization
-// - Apply professional UI/UX patterns
+// src/components/ChartSection.tsx
+import React, { useMemo } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { ExpectedRow } from "@/utils/microbialUtils";
+import { FitResult } from "@/types/fitResult";
 
 interface ChartSectionProps {
-  data: DataRow[];
-  showAll?: boolean;
+  data: ExpectedRow[];
+  fitResult?: FitResult | null;
 }
 
-// Color palette for charts - Week 8 enhancement: Make this theme-aware and customizable
-const COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+/** Group data by temperature and sort by time */
+const groupDataByTemperature = (data: ExpectedRow[]) => {
+  const groups: Record<number, ExpectedRow[]> = {};
 
-const ChartSection = ({ data, showAll = false }: ChartSectionProps) => {
-  // 🚀 React Performance Optimization - Critical for Professional Apps
-  // Students - Master the useMemo hook for optimal performance
-  // Why do we use useMemo here? What happens without it?
-  // Answer: Prevents expensive recalculations on every render, keeping your app fast!
-  const summary = useMemo(() => getDataSummary(data), [data]);
-  
-  // 🎯 Week 6-7: Dynamic User Controls - Professional Dashboard Feature
-  // Students - Add user control over which columns to visualize
-  // Current: Automatically selects first 2 numeric columns
-  // Week 7 enhancement: Let users choose columns, filter data, and save preferences
-  const numericColumns = useMemo(() => {
-    return Object.entries(summary.columnTypes)
-      .filter(([_, type]) => type === 'numeric')
-      .map(([column]) => column)
-      .slice(0, showAll ? 10 : 2);
-  }, [summary, showAll]);
-
-  // 📈 Week 6-8: Smart Data Processing - Handling Real-World Data
-  // Students - Learn to handle large datasets professionally
-  // Current: Shows first 20 rows (good for demos)
-  // Week 8 enhancement: Add pagination, aggregation, and intelligent sampling
-  const chartData = useMemo(() => {
-    if (numericColumns.length === 0) return [];
+  data.forEach((row) => {
+    const t = Number(row.temperature);
+    const time = Number(row.time);
+    const microbe = Number(row.microbe);
     
-    // Week 7 improvement: Use meaningful labels instead of "Row 1, Row 2..."
-    // Try using actual data values for better chart readability
-    return data.slice(0, 20).map((row, index) => {
-      const item: any = { name: `Row ${index + 1}` };
-      numericColumns.forEach(col => {
-        item[col] = typeof row[col] === 'number' ? row[col] : 0;
-      });
-      return item;
+    if (!Number.isFinite(t) || !Number.isFinite(time) || !Number.isFinite(microbe)) {
+      console.warn('Invalid data point:', row);
+      return;
+    }
+    
+    if (!groups[t]) groups[t] = [];
+    groups[t].push({ 
+      ...row, 
+      time, 
+      microbe,
+      temperature: t 
     });
-  }, [data, numericColumns]);
+  });
 
-  // 💡 Week 3-4: Professional Error Handling
-  // Students - Create helpful, actionable error messages
-  // Good UX guides users toward success, even when things go wrong
-  if (numericColumns.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Charts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-500 text-center py-8">
-            No numeric columns found for visualization. Upload data with numeric values to see charts.
-          </p>
-          {/* Week 4 enhancement: Add helpful tips for data format and examples */}
-        </CardContent>
-      </Card>
-    );
+  return Object.keys(groups)
+    .map((k) => {
+      const temp = Number(k);
+      const sortedData = groups[temp].sort((a, b) => a.time - b.time);
+      return {
+        temperature: temp,
+        data: sortedData,
+      };
+    })
+    .sort((a, b) => a.temperature - b.temperature);
+};
+
+/** Compute X axis domain */
+const computeXDomain = (data: ExpectedRow[]) => {
+  const times = data.map((r) => Number(r.time)).filter((t) => Number.isFinite(t));
+  if (times.length === 0) return [0, 1];
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  return [Math.max(0, min - 0.5), max + 0.5];
+};
+
+// 格式化函数，保留3位小数
+const formatToThreeDecimals = (value: number) => {
+  return typeof value === 'number' ? value.toFixed(3) : '0.000';
+};
+
+const ChartSection: React.FC<ChartSectionProps> = ({ data, fitResult = null }) => {
+  console.log('ChartSection received data:', data);
+
+  if (!data || data.length === 0) {
+    return <div className="text-gray-500 text-sm text-center p-4">No data to display</div>;
   }
 
-  // 📊 Week 7-8: Advanced Chart Library - Professional Visualization Options
-  // Students - Expand your visualization toolkit
-  // Current: bar, line, pie charts (solid foundation!)
-  // Week 8 additions: scatter plots, area charts, histograms, and interactive features
-  const charts = showAll ? [
-    { type: 'bar', title: 'Bar Chart' },
-    { type: 'line', title: 'Line Chart' },
-    { type: 'pie', title: 'Distribution' }
-  ] : [{ type: 'bar', title: 'Data Overview' }];
+  const groups = useMemo(() => groupDataByTemperature(data), [data]);
+  const xDomain = computeXDomain(data);
+
+  // 对拟合数据也按温度分组
+  const fittedGroups = useMemo(() => {
+    if (!fitResult?.fittedData) return [];
+    return groupDataByTemperature(
+      fitResult.fittedData.filter((r) => 
+        typeof r.time === "number" && 
+        typeof r.microbe_fitted === "number" &&
+        Number.isFinite(r.time) && 
+        Number.isFinite(r.microbe_fitted)
+      )
+    );
+  }, [fitResult]);
+
+  console.log('Processed groups:', groups);
+  console.log('Fitted groups:', fittedGroups);
+  console.log('Fit result:', fitResult);
 
   return (
-    <div className={`space-y-6 ${showAll ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : ''}`}>
-      {charts.map(({ type, title }) => (
-        <Card key={type}>
-          <CardHeader>
-            <CardTitle>{title}</CardTitle>
-            {/* Week 8-9: Add professional chart controls (zoom, filter, export) */}
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                {/* 🎨 Week 6: Master Chart Selection - Data Visualization Best Practices */}
-                {/* Students - Learn when to use bar vs line vs pie charts */}
-                {/* Professional tip: Chart choice should match your data story! */}
-                {type === 'bar' ? (
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    {/* Week 7: Add custom tooltip content for better user experience */}
-                    {numericColumns.map((column, idx) => (
-                      <Bar 
-                        key={column} 
-                        dataKey={column} 
-                        fill={COLORS[idx % COLORS.length]} 
-                      />
-                    ))}
-                  </BarChart>
-                ) : type === 'line' ? (
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    {numericColumns.map((column, idx) => (
-                      <Line 
-                        key={column}
-                        type="monotone" 
-                        dataKey={column} 
-                        stroke={COLORS[idx % COLORS.length]}
-                        strokeWidth={2}
-                      />
-                    ))}
-                  </LineChart>
-                ) : (
-                  // 🍰 Week 6-7: Smart Pie Chart Implementation
-                  // Students - Learn to handle pie chart data professionally
-                  // Current: Uses first numeric column (perfect for learning!)
-                  // Week 7: Add multi-column support and intelligent data grouping
-                  <PieChart>
-                    <Pie
-                      data={getColumnValues(data, numericColumns[0]).slice(0, 6).map((value, index) => ({ name: `Item ${index + 1}`, value }))}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label
-                    >
-                      {getColumnValues(data, numericColumns[0]).slice(0, 6).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                )}
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="w-full h-96">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="time"
+            type="number"
+            domain={xDomain}
+            label={{ value: "Time", position: "insideBottomRight", offset: -5 }}
+          />
+          <YAxis
+            type="number"
+            label={{ value: "Microbe", angle: -90, position: "insideLeft" }}
+            domain={['dataMin - 0.5', 'dataMax + 0.5']}
+            tickFormatter={formatToThreeDecimals}
+          />
+          <Tooltip 
+            formatter={(value: any) => [
+              typeof value === 'number' ? value.toFixed(3) : '0.000', 
+              'Microbe'
+            ]} 
+          />
+          <Legend />
+
+          {/* Draw each temperature group - 原始数据 */}
+          {groups.map((grp) => {
+            const validData = grp.data.filter(item => 
+              Number.isFinite(item.time) && Number.isFinite(item.microbe)
+            );
+
+            if (validData.length === 0) {
+              return null;
+            }
+
+            const stroke = `hsl(${(grp.temperature * 35) % 360}, 70%, 45%)`;
+            
+            return (
+              <Line
+                key={`data-${grp.temperature}`}
+                data={validData}
+                type="monotone"
+                dataKey="microbe"
+                stroke={stroke}
+                name={`T=${grp.temperature}°C (Data)`}
+                dot={{ r: 3 }}
+                isAnimationActive={false}
+                strokeWidth={2}
+                connectNulls={false}
+              />
+            );
+          })}
+
+          {/* Draw fitted lines for each temperature - 拟合曲线 */}
+          {fittedGroups.map((grp) => {
+            const validData = grp.data.map((r) => ({ 
+              time: Number(r.time), 
+              microbe: Number(r.microbe_fitted)
+            }));
+
+            if (validData.length === 0) {
+              return null;
+            }
+
+            const stroke = `hsl(${(grp.temperature * 35) % 360}, 70%, 45%)`;
+            
+            return (
+              <Line
+                key={`fitted-${grp.temperature}`}
+                data={validData}
+                type="monotone"
+                dataKey="microbe"
+                stroke={stroke}
+                strokeDasharray="5 5"
+                name={`T=${grp.temperature}°C (Fitted)`}
+                dot={false}
+                isAnimationActive={false}
+                strokeWidth={2}
+              />
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
+      
+      Fitted Result:
+      {fitResult && (
+        <div className="mt-2 text-xs text-gray-600">
+          <strong>{fitResult.method}</strong> | 
+          Average R² = {fitResult.rSquared.toFixed(4)}
+        </div>
+      )}
     </div>
   );
 };
 
 export default ChartSection;
-
-// 🚀 Week 8-10: Professional Features - Taking Your Charts to Production Level
-// Students - Choose your advanced features to implement:
-// 
-// Week 8-9 Options:
-// • Interactive drilling (click charts to explore deeper)
-// • Real-time data updates and live dashboards
-// • Professional export features (PNG, PDF, sharing)
-// • Custom themes that match your brand
-// 
-// Week 10 Polish:
-// • Accessibility excellence (ARIA labels, keyboard navigation)
-// • Performance optimization for large datasets
-// • Mobile-responsive chart behaviors
