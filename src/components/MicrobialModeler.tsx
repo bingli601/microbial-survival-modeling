@@ -253,14 +253,15 @@ const MicrobialModeler: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* <Card className="flex flex-col">
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Raw Data Preview (First 10 Rows)</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 overflow-auto">
             <DataTable data={processedData.slice(0, 10)} />
+            {/* <DataTable data={processedData} /> */}
           </CardContent>
-        </Card> */}
+        </Card>
       </div>
 
       {/* Third column */}
