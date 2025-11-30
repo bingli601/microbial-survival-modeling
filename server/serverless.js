@@ -13,7 +13,7 @@ app.use(express.json());
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || "gemini-pro";
-
+const API_URL = "/api/messages";
 if (!GEMINI_API_KEY) {
   console.error("❌ GEMINI_API_KEY is not set in environment variables");
 }
@@ -64,7 +64,8 @@ async function callGeminiAPI(sessionId, userText, data) {
 // 🚀 Routes
 // ============================
 
-app.post("/messages", async (req, res) => {
+//app.post("/messages", async (req, res) => {
+app.post(API_URL, async (req, res) => {
   const { data, text, sessionId } = req.body;
 
   if (!text || !sessionId) {
