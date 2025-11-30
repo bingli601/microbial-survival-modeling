@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Bot, User, Send, TrendingUp } from "lucide-react";
 
-const API_URL = "http://localhost:4000/api/messages";
+//const API_URL = "http://localhost:4000/api/messages";
+const API_URL = "/api/messages";
 
 interface AIChatProps {
   csv_data?: Record<string, any>[];
