@@ -28,13 +28,14 @@ a:hover {
 }
 
 body {
-  margin: 0;          /* 去掉默认外边距 */
-  padding: 0;         /* 去掉默认内边距 */
-  width: 100vw;       /* 占满整个视口宽度 */
-  min-width: 1600px;   /* 保证最小宽度 */
-  min-height: 100vh;  /* 保证最小高度为视口高度 */
+  margin: 0;          
+  padding: 0;         
+  /* width: 100vw;      
+  min-width: 1600px; 
+  min-height: 100vh;   */
   font-family: system-ui, sans-serif;
-  box-sizing: border-box; /* 避免内边距影响宽度 */
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 h1 {

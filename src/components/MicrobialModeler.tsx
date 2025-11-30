@@ -1,4 +1,4 @@
-// src/components/MicrobialModeler.tsx
+// MicrobialModeler.tsx
 import React, { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,36 +15,39 @@ import { DataRow } from "@/types/data";
 import { getDataSummary } from "@/utils/dataAnalysis";
 import { ExpectedRow, fitMicrobialModel } from "@/utils/microbialUtils";
 
-// 更新 FitResult 接口以匹配 microbialUtils 中的返回类型
 interface FitResult {
   modelName: string;
-  parameters: Record<string, any>; // 改为 any 以容纳复杂结构
-  rSquared: number;
+  parameters: Record<string, any>;
+  metrics: {
+    rmse: number;
+    mae: number;
+    r2: number;
+  };
   fittedData: (DataRow & { microbe_fitted?: number })[];
 }
 
 const MicrobialModeler: React.FC = () => {
   const [rawData, setRawData] = useState<ExpectedRow[]>([]);
   const [fileName, setFileName] = useState("");
-  const [selectedModel, setSelectedModel] = useState<"linear" | "weibull">("linear");
+  const [selectedModel, setSelectedModel] = useState<
+    "linear" | "ann" | "svr" | "gpr" | "knn" | "decision_tree"
+  >("linear");
   const [isFitting, setIsFitting] = useState(false);
   const [fitResult, setFitResult] = useState<FitResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Processed data is just rawData (no log transform)
   const processedData = useMemo(() => rawData.slice(), [rawData]);
-
   const rawSummary = useMemo(() => (rawData.length ? getDataSummary(rawData) : null), [rawData]);
-
-  // Count rows with valid time, temperature, microbe
-  const countValidRows = useMemo(() => {
-    return processedData.filter(
-      (r) =>
-        typeof r.time === "number" &&
-        typeof r.temperature === "number" &&
-        typeof r.microbe === "number"
-    ).length;
-  }, [processedData]);
+  const countValidRows = useMemo(
+    () =>
+      processedData.filter(
+        (r) =>
+          typeof r.time === "number" &&
+          typeof r.temperature === "number" &&
+          typeof r.microbe === "number"
+      ).length,
+    [processedData]
+  );
 
   const canFit = processedData.length > 0 && countValidRows > 0 && !isFitting;
 
@@ -55,7 +58,7 @@ const MicrobialModeler: React.FC = () => {
     setErrorMessage(null);
   }, []);
 
-  const handleReset = () => {
+  const handleGlobalReset = () => {
     setRawData([]);
     setFileName("");
     setSelectedModel("linear");
@@ -75,22 +78,22 @@ const MicrobialModeler: React.FC = () => {
 
     try {
       const result = await fitMicrobialModel(processedData, selectedModel);
-
-      // Ensure fittedData is sorted by time
+      // normalize fittedData times and sort
       result.fittedData = result.fittedData
-        .map(d => ({ ...d }))
+        .map((d) => ({ ...d }))
         .sort((a, b) => Number(a.time) - Number(b.time));
-
-      setFitResult(result);
-      
-      // 输出拟合信息到控制台
-      console.log("Fit completed:", {
+      // Some older code expected rSquared; we expose metrics.r2 instead
+      setFitResult({
         modelName: result.modelName,
-        rSquared: result.rSquared,
-        parameters: result.parameters
+        parameters: result.parameters ?? {},
+        metrics: (result as any).metrics ?? {
+          rmse: 0,
+          mae: 0,
+          r2: (result as any).rSquared ?? 0,
+        },
+        fittedData: result.fittedData,
       });
     } catch (err: any) {
-      console.error("Fitting error:", err);
       setErrorMessage(err?.message || "An error occurred during model fitting.");
     } finally {
       setIsFitting(false);
@@ -100,9 +103,7 @@ const MicrobialModeler: React.FC = () => {
   const renderSummaryTable = (dataSummary: ReturnType<typeof getDataSummary> | null) => {
     if (!dataSummary) return null;
     const { totalRows, columnStats } = dataSummary;
-
-    // Only show time and microbe
-    const relevantCols = ["time", "microbe"].filter(c => columnStats[c] !== undefined);
+    const relevantCols = ["time", "microbe"].filter((c) => columnStats[c] !== undefined);
 
     return (
       <div>
@@ -110,22 +111,26 @@ const MicrobialModeler: React.FC = () => {
           <thead className="bg-gray-50">
             <tr className="border-b">
               <th className="p-2 text-left">Statistic</th>
-              {relevantCols.map(col => (
-                <th key={col} className="p-2 text-right">{col}</th>
+              {relevantCols.map((col) => (
+                <th key={col} className="p-2 text-right">
+                  {col}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             <tr className="border-b">
               <td className="p-2 font-medium">Count</td>
-              {relevantCols.map(col => (
-                <td key={`${col}-count`} className="p-2 text-right">{totalRows}</td>
+              {relevantCols.map((col) => (
+                <td key={`${col}-count`} className="p-2 text-right">
+                  {totalRows}
+                </td>
               ))}
             </tr>
-            {["mean", "std", "min", "max"].map(stat => (
+            {["mean", "std", "min", "max"].map((stat) => (
               <tr key={stat} className="border-b hover:bg-gray-50">
                 <td className="p-2 font-medium">{stat.charAt(0).toUpperCase() + stat.slice(1)}</td>
-                {relevantCols.map(col => (
+                {relevantCols.map((col) => (
                   <td key={`${col}-${stat}`} className="p-2 text-right">
                     {columnStats[col] && columnStats[col][stat] != null
                       ? Number(columnStats[col][stat]).toFixed(2)
@@ -140,26 +145,34 @@ const MicrobialModeler: React.FC = () => {
     );
   };
 
-  // 渲染拟合结果信息
   const renderFitResultInfo = () => {
     if (!fitResult) return null;
-    
+    const { metrics } = fitResult;
     return (
-      <div className="mt-4 p-3 bg-blue-50 rounded-md text-sm">
-        <h4 className="font-semibold text-blue-800 mb-2">Fitted Result:</h4>
-        <div className="space-y-1">
-          <div><span className="font-medium">Model:</span> {fitResult.modelName}</div>
-          <div><span className="font-medium">R²:</span> {fitResult.rSquared.toFixed(4)}</div>
-          {fitResult.parameters.averageRSquared && (
-            <div><span className="font-medium">Average R²:</span> {fitResult.parameters.averageRSquared.toFixed(4)}</div>
-          )}
+      <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+        <div>
+          <strong>Model:</strong> {fitResult.modelName}
         </div>
+        <div>
+          <strong>RMSE:</strong> {Number(metrics.rmse ?? 0).toFixed(4)}
+        </div>
+        <div>
+          <strong>MAE:</strong> {Number(metrics.mae ?? 0).toFixed(4)}
+        </div>
+        <div>
+          <strong>R²:</strong> {Number(metrics.r2 ?? 0).toFixed(4)}
+        </div>
+        {fitResult.parameters && Object.keys(fitResult.parameters).length > 0 && (
+          <div className="mt-1 text-xs text-gray-700">
+            <strong>Parameters:</strong> {JSON.stringify(fitResult.parameters)}
+          </div>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="flex w-full max-w-full mx-auto min-h-screen gap-6 p-6">
+    <div className="flex w-full max-w-full gap-6">
       {/* First column */}
       <div className="w-1/4 flex flex-col gap-6">
         <Card className="flex flex-col">
@@ -170,8 +183,8 @@ const MicrobialModeler: React.FC = () => {
             </CardTitle>
             <CardDescription>Upload Time, Temperature, Microbe data (.csv)</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1">
-            <UploadProgressSimulator onComplete={handleDataLoad} />
+          <CardContent>
+            <UploadProgressSimulator onComplete={handleDataLoad} onReset={handleGlobalReset} />
           </CardContent>
         </Card>
 
@@ -182,23 +195,27 @@ const MicrobialModeler: React.FC = () => {
               Model
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col space-y-4 overflow-auto">
-            <div className="space-y-2">
-              <Label>Select Model</Label>
-              <Select
-                value={selectedModel}
-                onValueChange={(v: string) => setSelectedModel(v as "linear" | "weibull")}
-                disabled={isFitting}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select fitting model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="linear">Linear Model</SelectItem>
-                  <SelectItem value="weibull">Weibull Model</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <CardContent className="flex flex-col space-y-4">
+            <Label>Select Model</Label>
+            <Select
+              value={selectedModel}
+              onValueChange={(v: string) =>
+                setSelectedModel(v as "linear" | "ann" | "svr" | "gpr" | "knn" | "decision_tree")
+              }
+              disabled={isFitting}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select fitting model" />
+              </SelectTrigger>
+              <SelectContent className="bg-white shadow-lg rounded-md z-50">
+                <SelectItem value="linear">LINEAR</SelectItem>
+                <SelectItem value="ann">ANN</SelectItem>
+                <SelectItem value="svr">SVR</SelectItem>
+                <SelectItem value="gpr">GPR</SelectItem>
+                <SelectItem value="knn">KNN</SelectItem>
+                <SelectItem value="decision_tree">DT</SelectItem>
+              </SelectContent>
+            </Select>
 
             <Button onClick={handleModelFit} disabled={!canFit} className="w-full">
               {isFitting ? (
@@ -210,70 +227,56 @@ const MicrobialModeler: React.FC = () => {
                 "Fit Model"
               )}
             </Button>
-            
+
             {errorMessage && (
-              <div className="text-sm text-red-600 p-2 bg-red-50 rounded-md">{errorMessage}</div>
+              <div className="text-sm text-red-600 p-2 bg-red-50 rounded">{errorMessage}</div>
             )}
-            
+
             {renderFitResultInfo()}
-            
-            {rawData.length > 0 && (
-              <Button 
-                onClick={handleReset} 
-                variant="outline" 
-                className="w-full mt-2"
-              >
-                Reset Data
-              </Button>
-            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Second column */}
       <div className="w-1/2 flex flex-col gap-6">
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>Raw Data Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1">{renderSummaryTable(rawSummary)}</CardContent>
-        </Card>
-
-        <Card className="flex flex-col">
+        <Card>
           <CardHeader>
             <CardTitle>Survival Curves</CardTitle>
-            {fitResult && (
-              <CardDescription>
-                {fitResult.modelName} - R²: {fitResult.rSquared.toFixed(4)}
-              </CardDescription>
-            )}
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent>
             <ChartSection data={processedData} fitResult={fitResult} />
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>Raw Data Preview (First 10 Rows)</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-auto">
-            <DataTable data={processedData.slice(0, 10)} />
-            {/* <DataTable data={processedData} /> */}
-          </CardContent>
-        </Card>
+        <div className="flex gap-6">
+          {/* Raw Data Summary */}
+          <Card className="w-1/2">
+            <CardHeader>
+              <CardTitle>Raw Data Summary</CardTitle>
+            </CardHeader>
+            <CardContent>{renderSummaryTable(rawSummary)}</CardContent>
+          </Card>
+
+          {/* Raw Data Preview */}
+          <Card className="w-1/2">
+            <CardHeader>
+              <CardTitle>Raw Data Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable data={processedData} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Third column */}
       <div className="w-1/4 flex flex-col gap-6">
-        <Card className="flex flex-col">
+        <Card>
           <CardHeader>
             <CardTitle>AI Data Insights & Chat</CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-auto">
-              <AIChat csv_data={rawData} fitResult={fitResult} />
-            </div>
+          <CardContent>
+            <AIChat csv_data={rawData} fitResult={fitResult} />
           </CardContent>
         </Card>
       </div>

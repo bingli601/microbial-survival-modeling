@@ -37,9 +37,9 @@ const AIChat: React.FC<AIChatProps> = ({ csv_data = [], fitResult = null }) => {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  // useEffect(() => {
+  //   messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // }, [messages]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -246,10 +246,22 @@ const AIChat: React.FC<AIChatProps> = ({ csv_data = [], fitResult = null }) => {
           <div className="p-3 bg-blue-50 rounded-md text-xs">
             <div className="font-semibold text-blue-800 mb-1">Current Fitted Model:</div>
             <div className="space-y-1 text-blue-700">
-              <div><span className="font-medium">Model:</span> {fitResult.modelName}</div>
-              <div><span className="font-medium">R²:</span> {fitResult.rSquared?.toFixed(4)}</div>
-              {fitResult.parameters?.averageRSquared && (
-                <div><span className="font-medium">Average R²:</span> {fitResult.parameters.averageRSquared.toFixed(4)}</div>
+              <div>
+                <span className="font-medium">Model:</span> {fitResult.modelName}
+              </div>
+              <div>
+                <span className="font-medium">RMSE:</span> {fitResult.metrics.rmse.toFixed(4)}
+              </div>
+              <div>
+                <span className="font-medium">MAE:</span> {fitResult.metrics.mae.toFixed(4)}
+              </div>
+              <div>
+                <span className="font-medium">R²:</span> {fitResult.metrics.r2.toFixed(4)}
+              </div>
+              {fitResult.parameters && Object.keys(fitResult.parameters).length > 0 && (
+                <div className="mt-1 text-xs text-blue-700">
+                  <span className="font-medium">Parameters:</span> {JSON.stringify(fitResult.parameters)}
+                </div>
               )}
             </div>
           </div>

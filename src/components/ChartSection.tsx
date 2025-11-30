@@ -1,4 +1,3 @@
-// src/components/ChartSection.tsx
 import React, { useMemo } from "react";
 import {
   LineChart,
@@ -18,173 +17,150 @@ interface ChartSectionProps {
   fitResult?: FitResult | null;
 }
 
-/** Group data by temperature and sort by time */
+/** 按温度分组并排序时间 */
 const groupDataByTemperature = (data: ExpectedRow[]) => {
   const groups: Record<number, ExpectedRow[]> = {};
-
-  data.forEach((row) => {
-    const t = Number(row.temperature);
-    const time = Number(row.time);
-    const microbe = Number(row.microbe);
-    
-    if (!Number.isFinite(t) || !Number.isFinite(time) || !Number.isFinite(microbe)) {
-      console.warn('Invalid data point:', row);
-      return;
-    }
-    
+  data.forEach((r) => {
+    const t = Number(r.temperature);
+    const time = Number(r.time);
+    const microbe = Number(r.microbe);
+    if (!Number.isFinite(t) || !Number.isFinite(time) || !Number.isFinite(microbe)) return;
     if (!groups[t]) groups[t] = [];
-    groups[t].push({ 
-      ...row, 
-      time, 
-      microbe,
-      temperature: t 
-    });
+    groups[t].push({ ...r, time, microbe, temperature: t });
   });
 
   return Object.keys(groups)
     .map((k) => {
       const temp = Number(k);
-      const sortedData = groups[temp].sort((a, b) => a.time - b.time);
-      return {
-        temperature: temp,
-        data: sortedData,
-      };
+      return { temperature: temp, data: groups[temp].sort((a, b) => a.time - b.time) };
     })
     .sort((a, b) => a.temperature - b.temperature);
 };
 
-/** Compute X axis domain */
 const computeXDomain = (data: ExpectedRow[]) => {
   const times = data.map((r) => Number(r.time)).filter((t) => Number.isFinite(t));
-  if (times.length === 0) return [0, 1];
+  if (!times.length) return [0, 1];
   const min = Math.min(...times);
   const max = Math.max(...times);
   return [Math.max(0, min - 0.5), max + 0.5];
 };
 
-// 格式化函数，保留3位小数
-const formatToThreeDecimals = (value: number) => {
-  return typeof value === 'number' ? value.toFixed(3) : '0.000';
-};
+const formatToThreeDecimals = (value: number) =>
+  typeof value === "number" ? value.toFixed(3) : "0.000";
 
 const ChartSection: React.FC<ChartSectionProps> = ({ data, fitResult = null }) => {
-  console.log('ChartSection received data:', data);
-
-  if (!data || data.length === 0) {
+  if (!data || data.length === 0)
     return <div className="text-gray-500 text-sm text-center p-4">No data to display</div>;
-  }
 
   const groups = useMemo(() => groupDataByTemperature(data), [data]);
   const xDomain = computeXDomain(data);
 
-  // 对拟合数据也按温度分组
   const fittedGroups = useMemo(() => {
     if (!fitResult?.fittedData) return [];
     return groupDataByTemperature(
-      fitResult.fittedData.filter((r) => 
-        typeof r.time === "number" && 
-        typeof r.microbe_fitted === "number" &&
-        Number.isFinite(r.time) && 
-        Number.isFinite(r.microbe_fitted)
+      fitResult.fittedData.filter(
+        (r) =>
+          typeof r.time === "number" &&
+          typeof r.microbe_fitted === "number" &&
+          Number.isFinite(r.time) &&
+          Number.isFinite(r.microbe_fitted)
       )
     );
   }, [fitResult]);
 
-  console.log('Processed groups:', groups);
-  console.log('Fitted groups:', fittedGroups);
-  console.log('Fit result:', fitResult);
-
   return (
     <div className="w-full h-96">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart>
-          <CartesianGrid strokeDasharray="3 3" />
+        <LineChart margin={{ top: 20, right: 30, bottom: 20, left: 40 }}>
+          <CartesianGrid strokeDasharray="4 4" stroke="#f0f0f0" />
+
           <XAxis
             dataKey="time"
             type="number"
             domain={xDomain}
-            label={{ value: "Time", position: "insideBottomRight", offset: -5 }}
+            label={{
+              value: "Time (h)",
+              position: "insideBottomRight",
+              offset: -5,
+              fill: "#333",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+            tick={{ fill: "#555", fontSize: 12 }}
           />
+
           <YAxis
             type="number"
-            label={{ value: "Microbe", angle: -90, position: "insideLeft" }}
-            domain={['dataMin - 0.5', 'dataMax + 0.5']}
+            label={{
+              value: "Microbe (CFU/mL)",
+              angle: -90,
+              position: "insideLeft",
+              fill: "#333",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+            tick={{ fill: "#555", fontSize: 12 }}
+            domain={["dataMin - 0.5", "dataMax + 0.5"]}
             tickFormatter={formatToThreeDecimals}
           />
-          <Tooltip 
+
+          {/* Tooltip */}
+          <Tooltip
             formatter={(value: any) => [
-              typeof value === 'number' ? value.toFixed(3) : '0.000', 
-              'Microbe'
-            ]} 
+              typeof value === "number" ? value.toFixed(3) : "0.000",
+              "Microbe",
+            ]}
+            contentStyle={{
+              backgroundColor: "#ffffff",
+              borderRadius: 6,
+              border: "1px solid #ddd",
+              fontSize: 12,
+              boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+            }}
           />
-          <Legend />
 
-          {/* Draw each temperature group - 原始数据 */}
-          {groups.map((grp) => {
-            const validData = grp.data.filter(item => 
-              Number.isFinite(item.time) && Number.isFinite(item.microbe)
-            );
+          {/* Legend */}
+          <Legend wrapperStyle={{ fontSize: 12 }} />
 
-            if (validData.length === 0) {
-              return null;
-            }
-
-            const stroke = `hsl(${(grp.temperature * 35) % 360}, 70%, 45%)`;
-            
+          
+          {groups.map((grp, idx) => {
+            const validData = grp.data.map((r) => ({ ...r, microbe: Number(r.microbe) }));
+            const gray = 30 + (idx * 25) % 60; 
             return (
               <Line
                 key={`data-${grp.temperature}`}
                 data={validData}
                 type="monotone"
                 dataKey="microbe"
-                stroke={stroke}
-                name={`T=${grp.temperature}°C (Data)`}
-                dot={{ r: 3 }}
+                stroke="transparent" 
+                dot={{ r: 4, stroke: `hsl(0,0%,${gray}%)`, fill: `hsl(0,0%,${gray}%)` }}
                 isAnimationActive={false}
-                strokeWidth={2}
-                connectNulls={false}
+                name={`T=${grp.temperature}°C (Data)`}
               />
             );
           })}
 
-          {/* Draw fitted lines for each temperature - 拟合曲线 */}
           {fittedGroups.map((grp) => {
-            const validData = grp.data.map((r) => ({ 
-              time: Number(r.time), 
-              microbe: Number(r.microbe_fitted)
+            const validData = grp.data.map((r) => ({
+              time: Number(r.time),
+              microbe: Number(r.microbe_fitted),
             }));
-
-            if (validData.length === 0) {
-              return null;
-            }
-
-            const stroke = `hsl(${(grp.temperature * 35) % 360}, 70%, 45%)`;
-            
             return (
               <Line
-                key={`fitted-${grp.temperature}`}
+                key={`fit-${grp.temperature}`}
                 data={validData}
                 type="monotone"
                 dataKey="microbe"
-                stroke={stroke}
-                strokeDasharray="5 5"
-                name={`T=${grp.temperature}°C (Fitted)`}
+                stroke="#FF4136"
+                strokeWidth={2.5}
                 dot={false}
                 isAnimationActive={false}
-                strokeWidth={2}
+                name={`T=${grp.temperature}°C (Fitted)`}
               />
             );
           })}
         </LineChart>
       </ResponsiveContainer>
-      
-      Fitted Result:
-      {fitResult && (
-        <div className="mt-2 text-xs text-gray-600">
-          <strong>{fitResult.method}</strong> | 
-          Average R² = {fitResult.rSquared.toFixed(4)}
-        </div>
-      )}
     </div>
   );
 };

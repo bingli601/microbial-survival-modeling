@@ -1,5 +1,5 @@
 // DataUpload.tsx
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { parseCSVFile, ExpectedRow } from "@/utils/microbialUtils";
@@ -13,6 +13,7 @@ const DataUpload: React.FC<DataUploadProps> = ({ onComplete }) => {
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -28,11 +29,36 @@ const DataUpload: React.FC<DataUploadProps> = ({ onComplete }) => {
     }
   };
 
+  const simulateUploadIncrease = (current: number): number => {
+    if (current < 20) {
+      return current + (3 + Math.random() * 3);
+    } else if (current < 70) {
+      return current + (1 + Math.random() * 3);
+    } else if (current < 95) {
+      return current + (1 + Math.random() * 2);
+    } else {
+      return current + 1;
+    }
+  };
+
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     setSelectedFile(file);
     setProgress(0);
     setStatusMessage(file ? `Selected file: ${file.name}` : null);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.toLowerCase().endsWith(".csv")) {
+      setSelectedFile(file);
+      setProgress(0);
+      setStatusMessage(`Selected file: ${file.name}`);
+    } else {
+      setStatusMessage("Please drop a valid CSV file.");
+    }
   };
 
   const startUpload = () => {
@@ -44,41 +70,50 @@ const DataUpload: React.FC<DataUploadProps> = ({ onComplete }) => {
 
     setIsUploading(true);
     setProgress(0);
-    setStatusMessage("Preparing upload...");
+    setStatusMessage("Uploading...");
 
     intervalRef.current = setInterval(() => {
       setProgress((prev) => {
-        const next = Math.min(prev + Math.floor(Math.random() * 8 + 3), 100);
+        const next = simulateUploadIncrease(prev);
 
         if (next >= 100) {
           clearTimer();
           setIsUploading(false);
+          setProgress(100);
           setStatusMessage("Upload complete. Parsing file...");
 
           setTimeout(() => {
-            if (selectedFile) {
-              parseCSVFile(selectedFile)
-                .then((rows) => {
-                  setStatusMessage("File loaded successfully.");
-                  onComplete(rows, selectedFile.name);
-                })
-                .catch((err) => {
-                  console.error("CSV parse error:", err);
-                  setStatusMessage("Failed to parse CSV file. Check the format.");
-                });
-            }
-          }, 400);
-        } else {
-          if (next < 10) setStatusMessage("Starting upload...");
-          else if (next < 40) setStatusMessage("Uploading...");
-          else if (next < 70) setStatusMessage("Making good progress...");
-          else if (next < 95) setStatusMessage("Almost done...");
-          else setStatusMessage("Finishing up...");
+            parseCSVFile(selectedFile)
+              .then((rows) => {
+                setStatusMessage("File loaded successfully.");
+                onComplete(rows, selectedFile.name);
+              })
+              .catch(() => {
+                setStatusMessage("Failed to parse CSV file.");
+              });
+          }, 450);
+
+          return 100;
         }
 
         return next;
       });
     }, 120);
+  };
+
+  const startTemplateUpload = async () => {
+    try {
+      const response = await fetch("/sample-test-files/microbe_data.csv");
+      const text = await response.text();
+      const file = new File([text], "microbe_data.csv", { type: "text/csv" });
+
+      setSelectedFile(file);
+      setProgress(0);
+      setStatusMessage("Sample template selected.");
+
+    } catch {
+      setStatusMessage("Failed to load template sample.");
+    }
   };
 
   const resetUpload = () => {
@@ -90,8 +125,20 @@ const DataUpload: React.FC<DataUploadProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md max-w-md mx-auto">
-      <h3 className="text-xl font-semibold mb-4">Upload CSV File</h3>
+    <div
+      className={`p-6 bg-white rounded-lg shadow-md max-w-md mx-auto transition-border ${
+        dragOver ? "border-2 border-blue-500" : "border border-gray-200"
+      }`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+    >
+      <h3 className="text-xl font-semibold mb-4">
+        Upload Microbial Survival Data
+      </h3>
 
       <input
         type="file"
@@ -107,7 +154,7 @@ const DataUpload: React.FC<DataUploadProps> = ({ onComplete }) => {
         {statusMessage ?? (progress === 0 ? "Ready to upload" : "")}
       </div>
 
-      <div className="flex justify-center gap-3">
+      <div className="flex justify-center gap-3 mb-3">
         <Button
           onClick={startUpload}
           disabled={!selectedFile || isUploading || progress === 100}
@@ -117,6 +164,12 @@ const DataUpload: React.FC<DataUploadProps> = ({ onComplete }) => {
 
         <Button onClick={resetUpload} disabled={isUploading}>
           Reset
+        </Button>
+      </div>
+
+      <div className="flex justify-center">
+        <Button variant="secondary" onClick={startTemplateUpload}>
+          Load Sample Template
         </Button>
       </div>
     </div>
