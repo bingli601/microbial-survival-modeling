@@ -79,19 +79,7 @@ project/
 
 ## 🌐 Live Demo
 
-[Live Demo on Vercel](https://<your-vercel-deployment-url>.vercel.app)
-
----
-
-## 🖼️ Screenshots
-
-**AI Chat Interface**
-
-![Chat Interface](screenshots/chat-interface.png)
-
-**Dynamic Suggestions & Fitting Results**
-
-![Suggestions & Fitting](screenshots/suggestions-fitting.png)
+[Live Demo on Vercel](https://microbial-survival-modeling-vbhs-fb5ixb355.vercel.app/)
 
 ---
 
