@@ -1,6 +1,15 @@
 {
   "version": 2,
   "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "zeroConfig": true,
+        "outputDirectory": "dist"
+      }
+    },
     { "src": "api/serverless.cjs", "use": "@vercel/node" }
   ],
   "routes": [
