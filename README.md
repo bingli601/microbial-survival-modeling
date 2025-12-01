@@ -1,73 +1,113 @@
-# React + TypeScript + Vite
+# AI Data Assistant
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An interactive web application that allows users to chat with an AI assistant about their datasets and fitted model results. Built with **React**, **Vite**, **Express (Serverless)**, and deployed on **Vercel**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Features
 
-## React Compiler
+* **Interactive AI Chat**: Ask questions about your dataset and get real-time responses.
+* **Model Fitting Analysis**: Provides insights based on fitted model results (RMSE, MAE, R², parameters).
+* **Session Management**: Keeps multi-turn conversation per session.
+* **Dynamic Suggestions**: Suggests relevant questions automatically based on dataset and model fitting.
+* **Serverless Backend**: Express API deployed as serverless functions on Vercel.
+* **CORS Enabled**: Safe cross-origin requests from frontend.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠️ Setup Instructions
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 1. Clone the repository
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone https://github.com/bingli601/microbial-survival-modeling.git
+cd microbial-survival-modeling
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Install dependencies
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
+
+### 3. Environment Variables
+
+Create a `.env` file in the root or configure on Vercel:
+
+```env
+GEMINI_API_KEY=<YOUR_GOOGLE_GEMINI_API_KEY>
+GEMINI_MODEL=gemini-pro
+```
+
+### 4. Local Development
+
+Start both frontend and serverless backend:
+
+```bash
+npx vercel dev
+```
+
+* Frontend available at `http://localhost:3000`
+* API available at `http://localhost:3000/api/messages`
+
+### 5. Production Deployment
+
+Deploy to Vercel:
+
+```bash
+npx vercel --prod
+```
+
+---
+
+## 📂 Project Structure
+
+```
+project/
+├─ api/                  # Vercel serverless API entry
+│  └─ server.js
+├─ server/               # Express server code
+│  └─ serverless.js
+├─ src/                  # React frontend components
+│  └─ components/AIChat.tsx
+├─ vercel.json           # Vercel configuration
+├─ package.json
+├─ .env                  # Environment variables
+```
+
+---
+
+## 🌐 Live Demo
+
+[Live Demo on Vercel](https://<your-vercel-deployment-url>.vercel.app)
+
+---
+
+## 🖼️ Screenshots
+
+**AI Chat Interface**
+
+![Chat Interface](screenshots/chat-interface.png)
+
+**Dynamic Suggestions & Fitting Results**
+
+![Suggestions & Fitting](screenshots/suggestions-fitting.png)
+
+---
+
+## ⚡ Usage
+
+1. Enter your dataset or fitted model results.
+2. Ask questions in the input box.
+3. Click **Send** or press **Enter**.
+4. AI responses appear in real-time with conversation history.
+
+---
+
+## 📌 Notes
+
+* Ensure `GEMINI_API_KEY` is set properly, otherwise AI responses will fail.
+* For local testing, `npx vercel dev` simulates the serverless environment.
+* Production deployment requires setting environment variables in Vercel dashboard.
+
+---
